@@ -1,0 +1,315 @@
+# PROJET: ANALYSE DE DONNEES
+
+# Dorine FONTAINE
+
+
+
+## Problème 1
+
+### Liste des fichiers d'images de référence
+
+```{r}
+getwd()
+ref<-list.files(path = "./referenceFaceData",full.names=TRUE)
+ref
+```
+
+### Chargement de la librairie pixmap
+
+```{r}
+#install.packages( "factoextra")
+library(pixmap)
+
+```
+
+### Lecture des fichier d'images de référence
+
+```{r}
+imgRef=lapply(ref,read.pnm)
+lapply(imgRef,plot)
+```
+
+### Liste des matrices des images de référence
+
+```{r}
+imgRefMat=lapply(imgRef,function(x){x@grey[0:100,0:90]})
+imgRefMat1<-imgRefMat[[1]]
+imgRefMat1[1:7,1:5]
+```
+
+### Conversion des matrices d'images de référence en vecteurs
+
+```{r}
+imgRefVector=lapply(imgRefMat,function(x){as.vector(t(x))})
+#length(imgRefVector[[1]])
+```
+
+### Construction de la matrice dont les lignes sont les vecteurs de imgRefVector
+
+```{r}
+imgRefMatPCA=t(sapply(imgRefVector,rbind))
+
+```
+
+### Noms des lignes de la matrice imgRefMatPCA
+
+```{r}
+rownames(imgRefMatPCA)=lapply(1:nrow(imgRefMatPCA),function(x){v=paste("r",x)})
+imgRefMatPCA[,1:5]
+```
+
+### Liste des fichiers d'images test
+
+```{r}
+test<-list.files(path = "./testFaceData",full.names=TRUE)
+test
+```
+
+### Lecture des fichier d'images test
+
+```{r}
+imgTest=lapply(test,read.pnm)
+lapply(imgTest,plot)
+```
+
+### Liste des matrices des images test
+
+```{r}
+imgTestMat=lapply(imgTest,function(x){x@grey[0:100,0:90]})
+```
+
+### Conversion des matrices d'images test en vecteurs
+
+```{r}
+imgTestVector=lapply(imgTestMat,function(x){as.vector(t(x))})
+```
+
+# Construction de la matrice dont les lignes sont les vecteurs de imgTestVector
+
+```{r}
+imgTestMatPCA=t(sapply(imgTestVector,rbind))
+```
+
+### Noms des lignes de la matrice imgTestMatPCA
+
+```{r}
+rownames(imgTestMatPCA)=lapply(1:nrow(imgTestMatPCA),function(x){v=paste("t",x)})
+```
+
+### Construction de la matrice de données contenant les vecteurs visages de référence et vecteurs visages test
+
+```{r}
+donnees<- rbind(imgRefMatPCA, imgTestMatPCA)
+
+dim(donnees)
+```
+
+# PARTIE 1 RECONNAISSANCE FACIALE
+
+## 2-PCA sur les données des images réferences
+
+```{r}
+#Import des librairies et chargements
+
+#install.packages("factoextra")
+library("factoextra")
+library("FactoMineR")
+
+#Analyse par composante principale (ACP) ayant définis les images test comme individus suplémentaire
+ 
+visage.pca <- PCA( donnees,ind.sup =11:15,ncp=9 )
+
+#Observation 
+
+#summary(donne_PCA)
+
+#Affectation des valeurs propres résultant de l'ACP
+
+donne_eigenvalue<-visage.pca$eig[,1]
+
+
+#Calcule de l'inertie du nuage des individus 
+
+inertie=sum(donne_eigenvalue)
+
+
+#Eboulis des valeurs des valeurs propres
+
+fviz_eig(visage.pca, addlabels = TRUE, ylim = c(0, 30))+labs(title ="Eboulis des valeurs propres")
+
+#A)
+#Nombre d'axe à retenir selon le critére de Kaiser 
+
+k = length(donne_eigenvalue[donne_eigenvalue>=I1/ncol(donnees)])
+cat("Il y a ",k, "axe a retenir selon le critéres de Kaiser\n")
+
+#B)
+#Pourcentage d'inertie cumulée des Dim 1 à 9
+
+cat("\nLe pourcentage d'inertie obtenu par le sous-espaces factoriel Ek est de",visage.pca$eig[9,3], "%")
+
+
+```
+
+## 3-Manipulation des visages test
+
+### A) Pour évaluer la qualité de représentation des axes sur les dimentions, on garde les axes dont la somme des cos2 deux à deux est le plus proches de 1.
+
+```{r}
+
+meilleur_plan<-function(){
+  
+  
+ 
+  for (p in 1:5){
+    index1<-0
+    index2<-0
+    max<-0
+    for (i in 1:9){
+      for(j in i:9){
+      
+       
+    
+      if(i!=j){
+     
+         somme <- visage.pca$ind.sup$cos2[p,i] + visage.pca$ind.sup$cos2[p,j]
+         
+         
+         if (max<somme){
+           max<-somme
+           index1<-i
+           index2<-j
+           
+           
+           
+           
+         }
+         
+     
+      
+    }
+    }
+  
+  
+    }
+   inertie_plan= pourcentage_inertie[index1]+pourcentage_inertie[index2]
+   cat("\n Les dimentions sont", index1,"et ",index2, "pour l'image test",p,"avec un pourcentage d'inertie du plan de", inertie_plan)
+  
+  
+  
+}
+}
+  
+  
+
+
+meilleur_plan()
+
+
+
+
+```
+
+### B)Réprésentation sur des individus test sur le meilleur plan
+
+```{r}
+#Pour t1
+plot(visage.pca, choix = "ind", axes = c(1, 2), lim.cos2.var = 0)+labs(title ="Meilleure representation pour t1")
+#Pour t2
+plot(visage.pca, choix = "ind", axes = c(1, 7), lim.cos2.var = 0)+labs(title ="Meilleure representation pour t2")
+#Pour t3
+plot(visage.pca, choix = "ind", axes = c(3, 4), lim.cos2.var = 0)+labs(title ="Meilleure representation pour t3")
+#Pour t4
+plot(visage.pca, choix = "ind", axes = c(3, 5), lim.cos2.var = 0)+labs(title ="Meilleure representation pour t4")
+#Pour t5
+plot(visage.pca, choix = "ind", axes = c(3, 6), lim.cos2.var = 0)+labs(title ="Meilleure representation pour t5")
+
+
+
+
+```
+
+### C) Identification, à partir de la représentation sur P, d'un visage de référence aussi proche que possible d'un visage test, en tenant compte des contributions à l'inertie de P et des qualités de représentation sur P.
+
+```{r}
+
+cat("L'image test t1 ressemble à l'image référence r6 sur la dim 2 et 1, avec une contribution de r6 sur ce plan de ",visage.pca$ind$contrib[6,1]+ visage.pca$ind$contrib[6,2])
+cat("\n")
+cat("\nL'image test t2 ressemble à l'image référence r9 sur la dim 7 et 1, avec une contribution de r6 sur ce plan de ",visage.pca$ind$contrib[9,1]+ visage.pca$ind$contrib[9,7])
+cat("\n")
+cat("\nL'image test t3 ressemble à l'image référence r7 sur la  dim 4 et 3, avec une contribution de r6 sur ce plan de ",visage.pca$ind$contrib[7,3]+ visage.pca$ind$contrib[7,4])
+cat("\n")
+cat("\nL'image test t4 ressemble à l'image référence r8 sur la dim 5 et 3, avec une contribution de r6 sur ce plan de ",visage.pca$ind$contrib[8,5]+ visage.pca$ind$contrib[8,3])
+cat("\n")
+cat("\nL'image test t5 ressemble à l'image référence r10 sur la dim 6 et 3, avec une contribution de r6 sur ce plan de ",visage.pca$ind$contrib[10,6]+ visage.pca$ind$contrib[10,3])
+cat("\n")
+
+contribution_moyenne<-sum(visage.pca$ind$contrib[1,])/9
+cat("\n")
+cat("\nLa contribution moyenne est ", contribution_moyenne,", tout les points référence cité plus haut sont au dessus de cette moyenne, ce qui signifie que chaque point a une bonne contribution.")
+
+```
+
+### D) Vérification de la proximité inférée à la question précédente en calculant les distances euclidiennes entre le visage test et chacun des visage de référence, à partir des coordonnées principales par rapport aux k axes factoriels retenu.
+
+### E) Affichage simultané du visage test et du visage identifié.
+
+```{r}
+tableau <- rbind( visage.pca$ind$coord,visage.pca$ind.sup$coord )
+distance <- dist( tableau )
+distance1 <- as.matrix( distance )
+
+correspondance<-function(){
+  
+  
+  
+  for(i in 11:15){
+    
+    min<-1000
+    index4<-0
+    
+    for (j in 1:10){
+      
+      dist<-distance1[i,j]
+      
+      if (min>dist){
+        
+           min<-dist
+           index4<-j
+           
+           }
+    }
+    
+    test <- i-10
+    
+    cat("\nL'image test ",test,"ressemble à l'image de réference ",index4,"avec un min de", min)
+    lapply( imgTest[test],plot )
+    lapply( imgRef[index4],plot )
+    
+    }
+  }
+
+
+
+
+correspondance()
+```
+
+## 4. Classification Ascendante Hiérarchique (CAH) sur les individus de reference avec la distance euclidienne et la méthode de WARD
+
+```{r}
+cah.visage_ref <- hclust( dist(visage.pca$ind$coord),method="ward.D2" )
+plot( cah.visage_ref,main = "Classification des visages de références" )
+
+```
+
+## 5. Reunion des visages test contenus dans l'archive « visagestest » et des visages de références contenus dans l'archive « visages de référence » en un même nuage. Réalisation d'une classification ascendante hiérarchique (CAH) du projeté de ce nuage sur la sous-espace principal retenu à la question 1, en utilisant la même distance et le même lien d'agrégation choisis à la question précedente.
+
+```{r}
+
+cah.visage_ref_test <- hclust( dist(tableau),method="ward.D2" )
+plot( cah.visage_ref,main = "Classification des visages de références et des visages test" )
+
+
+```
+
